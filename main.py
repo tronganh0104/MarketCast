@@ -76,6 +76,9 @@ def create_payment(req: PaymentRequest):
 
     return response.json()
 
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
 # ===== RUN =====
 if __name__ == "__main__":
