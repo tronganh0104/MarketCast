@@ -76,6 +76,13 @@ def create_payment(req: PaymentRequest):
 
     return response.json()
 
+@app.post("/your-endpoint")
+async def your_endpoint(request: PaymentRequest):
+    body = await request.json()
+    print("=== REQUEST BODY ===")
+    print(body)
+    return {"ok": True}
+
 @app.get("/")
 def root():
     return {"status": "ok"}
