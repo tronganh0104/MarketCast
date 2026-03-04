@@ -191,6 +191,11 @@ async def payos_webhook(request: Request):
 
     return {"status": "success"}
 
+@app.post("/{full_path:path}")
+async def debug(full_path: str):
+    print("CALLED PATH:", full_path)
+    return {"path": full_path}
+
 # ===== RUN =====
 if __name__ == "__main__":
     import uvicorn
