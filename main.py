@@ -16,92 +16,17 @@ app = FastAPI()
 PAYOS_CLIENT_ID = os.getenv("PAYOS_CLIENT_ID")
 PAYOS_API_KEY = os.getenv("PAYOS_API_KEY")
 PAYOS_CHECKSUM_KEY = os.getenv("PAYOS_CHECKSUM_KEY")
-BUBBLE_BASE_URL = os.getenv("BUBBLE_BASE_URL")
-BUBBLE_API_KEY = os.getenv("BUBBLE_API_KEY")
 
 PAYOS_URL = "https://api-merchant.payos.vn/v2/payment-requests"
 
-
-def sort_obj_by_key(obj: dict) -> dict:
-    return dict(sorted(obj.items()))
-
-def convert_obj_to_query_str(obj: dict) -> str:
-    query_string = []
-
-    for key, value in obj.items():
-
-        if isinstance(value, (int, float, bool)):
-            value_str = str(value)
-
-        elif value in [None, "null", "NULL"]:
-            value_str = ""
-
-        elif isinstance(value, list):
-            value_str = json.dumps(
-                [sort_obj_by_key(item) for item in value],
-                separators=(",", ":")
-            ).replace("None", "null")
-
-        else:
-            value_str = str(value)
-
-        query_string.append(f"{key}={value_str}")
-
-    return "&".join(query_string)
-
-
-def verify_webhook_signature(data: dict, received_signature: str) -> bool:
-
-    sorted_data = sort_obj_by_key(data)
-    data_query_str = convert_obj_to_query_str(sorted_data)
-
-    calculated_signature = hmac.new(
-        PAYOS_CHECKSUM_KEY.encode("utf-8"),
-        msg=data_query_str.encode("utf-8"),
-        digestmod=hashlib.sha256
-    ).hexdigest()
-
-    return calculated_signature == received_signature
-
-def get_transaction_from_bubble(order_code: int):
-
-    url = f"{BUBBLE_BASE_URL}/Transaction?constraints=[{{\"key\":\"order code\",\"constraint_type\":\"equals\",\"value\":{order_code}}}]"
-
-    headers = {
-        "Authorization": f"Bearer {BUBBLE_API_KEY}"
-    }
-
-    res = requests.get(url, headers=headers)
-    data = res.json()
-
-    results = data.get("response", {}).get("results", [])
-
-    if not results:
-        return None
-
-    return results[0]
-
-def update_transaction_success(transaction_id: str):
-
-    url = f"{BUBBLE_BASE_URL}/transaction/{transaction_id}"
-
-    headers = {
-        "Authorization": f"Bearer {BUBBLE_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    body = {
-        "status": "SUCCESS",
-        "process": True
-    }
-
-    return requests.patch(url, json=body, headers=headers)
 
 # ===== REQUEST MODEL =====
 class CreatePaymentRequest(BaseModel):
     amount: int = Field(ge=1000)
     orderCode: int
 
+class CheckPayment(BaseModel):
+    orderCode: int
 
 # ===== SIGNATURE FUNCTION =====
 def create_signature(data: dict):
@@ -148,63 +73,28 @@ def create_payment(req: CreatePaymentRequest):
 
     return response.json()
 
-@app.post("/webhook/payos")
-@app.post("/webhook/payos/")
-async def payos_webhook(request: Request):
+# ===== CHECK PAYMENT ENDPOINT =====
+@app.get("/check-payment/{orderCode}")
+def check_payment(orderCode: int):
+    
+    url = f"{PAYOS_URL}/{orderCode}"
 
-    body = await request.json()
+    headers = {
+        "x-client-id": PAYOS_CLIENT_ID,
+        "x-api-key": PAYOS_API_KEY,
+        "Content-Type": "application/json"
+    }
 
-    data = body.get("data")
-    received_signature = body.get("signature")
+    response = requests.get(url, headers=headers)
 
-    if not data or not received_signature:
-        raise HTTPException(status_code=400, detail="Invalid payload")
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.text
+        )
 
-    # 1️⃣ Verify chữ ký
-    if not verify_webhook_signature(data, received_signature):
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    return response.json()
 
-    # 2️⃣ Chỉ xử lý nếu thanh toán thành công
-    if not (body.get("success") and data.get("code") == "00"):
-        return {"status": "ignored"}
-
-    order_code = data["orderCode"]
-    amount_paid = data["amount"]
-
-    # 3️⃣ Lấy transaction từ Bubble
-    transaction = get_transaction_from_bubble(order_code)
-
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    # 4️⃣ Kiểm tra amount khớp
-    if int(transaction["amount"]) != int(amount_paid):
-        raise HTTPException(status_code=400, detail="Amount mismatch")
-
-    # 5️⃣ Chống xử lý 2 lần
-    if transaction.get("process"):
-        return {"status": "already_processed"}
-
-    # 6️⃣ Update SUCCESS
-    update_transaction_success(transaction["_id"])
-
-    print(f"Thanh toán thành công cho order {order_code}")
-
-    return {"status": "success"}
-
-@app.middleware("http")
-async def log_all_requests(request: Request, call_next):
-
-    print("---- NEW REQUEST ----")
-    print("Method:", request.method)
-    print("URL:", str(request.url))
-
-    response = await call_next(request)
-
-    print("Status:", response.status_code)
-    print("----------------------")
-
-    return response
 
 # ===== RUN =====
 if __name__ == "__main__":
