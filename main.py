@@ -194,32 +194,17 @@ async def payos_webhook(request: Request):
 
 @app.middleware("http")
 async def log_all_requests(request: Request, call_next):
-    start_time = time.time()
 
-    # Log request cơ bản
     print("---- NEW REQUEST ----")
     print("Method:", request.method)
     print("URL:", str(request.url))
-    print("Path:", request.url.path)
-    print("Query:", request.url.query)
-
-    # Nếu muốn đọc body (chỉ dùng khi cần)
-    try:
-        body = await request.body()
-        if body:
-            print("Body:", body.decode())
-    except:
-        pass
 
     response = await call_next(request)
 
-    process_time = time.time() - start_time
     print("Status:", response.status_code)
-    print("Time:", process_time)
     print("----------------------")
 
     return response
-
 
 # ===== RUN =====
 if __name__ == "__main__":
