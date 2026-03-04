@@ -148,6 +148,7 @@ def create_payment(req: CreatePaymentRequest):
     return response.json()
 
 @app.post("/webhook/payos")
+@app.post("/webhook/payos/")
 async def payos_webhook(request: Request):
 
     body = await request.json()
