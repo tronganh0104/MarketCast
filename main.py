@@ -24,10 +24,6 @@ PAYOS_URL = "https://api-merchant.payos.vn/v2/payment-requests"
 def sort_obj_by_key(obj: dict) -> dict:
     return dict(sorted(obj.items()))
 
-def sort_obj_by_key(obj: dict) -> dict:
-    return dict(sorted(obj.items()))
-
-
 def convert_obj_to_query_str(obj: dict) -> str:
     query_string = []
 
@@ -68,7 +64,7 @@ def verify_webhook_signature(data: dict, received_signature: str) -> bool:
 
 def get_transaction_from_bubble(order_code: int):
 
-    url = f"{BUBBLE_BASE_URL}/transaction?constraints=[{{\"key\":\"orderCode\",\"constraint_type\":\"equals\",\"value\":{order_code}}}]"
+    url = f"{BUBBLE_BASE_URL}/Transaction?constraints=[{{\"key\":\"order code\",\"constraint_type\":\"equals\",\"value\":{order_code}}}]"
 
     headers = {
         "Authorization": f"Bearer {BUBBLE_API_KEY}"
@@ -95,7 +91,7 @@ def update_transaction_success(transaction_id: str):
 
     body = {
         "status": "SUCCESS",
-        "processed": True
+        "process": True
     }
 
     return requests.patch(url, json=body, headers=headers)
@@ -180,11 +176,11 @@ async def payos_webhook(request: Request):
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     # 4️⃣ Kiểm tra amount khớp
-    if transaction["amount"] != amount_paid:
+    if int(transaction["amount"]) != int(amount_paid):
         raise HTTPException(status_code=400, detail="Amount mismatch")
 
     # 5️⃣ Chống xử lý 2 lần
-    if transaction.get("processed"):
+    if transaction.get("process"):
         return {"status": "already_processed"}
 
     # 6️⃣ Update SUCCESS
