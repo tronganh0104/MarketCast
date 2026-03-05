@@ -33,7 +33,7 @@ def get_open_ato_markets():
     params = {
         "constraints": json.dumps([
             {
-                "key": "is_ato",  # FIXED
+                "key": "is ato",  # FIXED
                 "constraint_type": "equals",
                 "value": True
             }
@@ -62,7 +62,7 @@ def close_ato(market_id: str):
     }
 
     payload = {
-        "is_ato": False  # FIXED
+        "is ato": False  # FIXED
     }
 
     response = requests.patch(url, headers=headers, json=payload)
@@ -78,7 +78,7 @@ def check_and_close_ato():
     for market in markets:
         try:
             ato_end_time = datetime.fromisoformat(
-                market["ato_end_time"].replace("Z", "+00:00")
+                market["ato end time"].replace("Z", "+00:00")
             )
 
             if ato_end_time <= now:
