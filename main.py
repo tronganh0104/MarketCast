@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import payment
+from routers import payment, clearingprice
 
 app = FastAPI()
 
@@ -9,3 +9,4 @@ def root():
 
 
 app.include_router(payment.router)
+app.include_router(clearingprice.router, tags=["ATO"])
