@@ -137,6 +137,6 @@ def clear_ato(data: ATORequest):
     return {
         "clearing_price_yes": p,
         "clearing_price_no": 100 - p,
-        "matched_volume": 0,
+        "matched_volume": matched_volume,
         "trades": trades
     }
