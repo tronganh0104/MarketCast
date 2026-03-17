@@ -44,7 +44,7 @@ def calculate_clearing_price(orderbook_yes, orderbook_no) -> int:
     
     demand_yes = [0] * 101
     demand_no = [0] * 101
-
+ 
     running = 0
     for p in range(99, 0, -1):
         running += yes_volume[p]
@@ -132,7 +132,7 @@ def clear_ato(data: ATORequest):
 
     sort_orders(yes_valid, no_valid)
 
-    trades = match_order(yes_valid, no_valid, matched_volume)
+    trades = match_order(yes_valid, no_valid, p, matched_volume)
 
     return {
         "clearing_price_yes": p,
