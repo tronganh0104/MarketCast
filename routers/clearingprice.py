@@ -1,10 +1,20 @@
 from fastapi import APIRouter
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
+from collections import defaultdict
 import copy
 
 router = APIRouter()
+
+# =========================
+# MODELS
+# =========================
+
+class UserSettlement(BaseModel):
+    user_id: str
+    spent: int
+    refund: int
 
 class Order(BaseModel):
     id: str
@@ -31,8 +41,13 @@ class ATOResponse(BaseModel):
     clearing_price_no: Optional[int]
     matched_volume: int
     trades: List[Trade]
+    settlements: list[UserSettlement]
 
-def calculate_clearing_price(orderbook_yes, orderbook_no) -> int:
+# =========================
+# CLEARING PRICE
+# =========================
+
+def calculate_clearing_price(orderbook_yes: List[Order], orderbook_no: List[Order]):
     yes_volume = [0] * 101
     no_volume = [0] * 101
 
@@ -72,16 +87,24 @@ def calculate_clearing_price(orderbook_yes, orderbook_no) -> int:
 
     return best_p, best_volume
 
-def filter_orders(orderbook_yes, orderbook_no, p):
+# =========================
+# FILTER + SORT
+# =========================
+
+def filter_orders(orderbook_yes: List[Order], orderbook_no: List[Order], p: int):
     yes_valid = [o for o in orderbook_yes if o.price >= p]
     no_valid = [o for o in orderbook_no if o.price >= (100 - p)]
     return yes_valid, no_valid
 
-def sort_orders(yes_orders, no_orders):
+def sort_orders(yes_orders: List[Order], no_orders: List[Order]):
     yes_orders.sort(key=lambda o: (-o.price, o.created_at.timestamp()))
     no_orders.sort(key=lambda o: (-o.price, o.created_at.timestamp()))
 
-def match_order(yes_orders, no_orders, p, max_volume):
+# =========================
+# MATCHING ENGINE
+# =========================
+
+def match_order(yes_orders: List[Order], no_orders: List[Order], p: int, max_volume: int):
     trades = []
     i, j = 0, 0
     remaining = max_volume
@@ -113,8 +136,49 @@ def match_order(yes_orders, no_orders, p, max_volume):
             j += 1
     return trades
 
+# =========================
+# SETTLEMENT ENGINE
+# =========================
+
+def calculate_settlements(trades: List[Trade], yes_map: Dict[str, Order], no_map: Dict[str, Order], p: int) -> List[UserSettlement]:
+    settlements = defaultdict(lambda: {"spent" : 0, "refund" : 0})
+    for t in trades:
+        y_order = yes_map[t.yes_order_id]
+        n_order = no_map[t.no_order_id]
+        qty = t.quantity
+
+        locked_yes = y_order.price * qty
+        actual_yes = p * qty
+        refund_yes = locked_yes - actual_yes
+
+        settlements[t.buy_yes_user_id]["spent"] += actual_yes
+        settlements[t.buy_yes_user_id]["refund"] += refund_yes
+
+        locked_no = n_order.price * qty
+        actual_no = (100 - p) * qty
+        refund_no = locked_no - actual_no
+
+        settlements[t.buy_no_user_id]["spent"] += actual_no
+        settlements[t.buy_no_user_id]["refund"] += refund_no
+
+    return [
+        UserSettlement(
+            user_id = uid,
+            spent = data["spent"],
+            refund = data["refund"]
+        )
+        for uid, data in settlements.items()
+    ]
+
+# =========================
+# API
+# =========================
 @router.post("/clear", response_model=ATOResponse)
 def clear_ato(data: ATORequest):
+
+    yes_map = {o.id: o for o in data.orderbook_yes}
+    no_map = {o.id: o for o in data.orderbook_no}
+    
     yes_orders = copy.deepcopy(data.orderbook_yes)
     no_orders = copy.deepcopy(data.orderbook_no)
 
@@ -125,7 +189,8 @@ def clear_ato(data: ATORequest):
             "clearing_price_yes": None,
             "clearing_price_no": None,
             "matched_volume": 0,
-            "trades": []
+            "trades": [],
+            "settlements": []
         }
 
     yes_valid, no_valid = filter_orders(yes_orders, no_orders, p)
@@ -134,9 +199,12 @@ def clear_ato(data: ATORequest):
 
     trades = match_order(yes_valid, no_valid, p, matched_volume)
 
+    settlements = calculate_settlements(trades, yes_map, no_map, p)
+
     return {
         "clearing_price_yes": p,
         "clearing_price_no": 100 - p,
         "matched_volume": matched_volume,
-        "trades": trades
+        "trades": trades,
+        "settlements": settlements
     }
