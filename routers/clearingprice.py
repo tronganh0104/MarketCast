@@ -97,8 +97,8 @@ def filter_orders(orderbook_yes: List[Order], orderbook_no: List[Order], p: int)
     return yes_valid, no_valid
 
 def sort_orders(yes_orders: List[Order], no_orders: List[Order]):
-    yes_orders.sort(key=lambda o: (-o.price, o.created_at.timestamp()))
-    no_orders.sort(key=lambda o: (-o.price, o.created_at.timestamp()))
+    yes_orders.sort(key=lambda o: (-o.price, o.created_at))
+    no_orders.sort(key=lambda o: (-o.price, o.created_at))
 
 # =========================
 # MATCHING ENGINE
@@ -176,8 +176,8 @@ def calculate_settlements(trades: List[Trade], yes_map: Dict[str, Order], no_map
 @router.post("/clear", response_model=ATOResponse)
 def clear_ato(data: ATORequest):
 
-    yes_map = {o.id: o for o in data.orderbook_yes}
-    no_map = {o.id: o for o in data.orderbook_no}
+    yes_map = {o.id: copy.deepcopy(o) for o in data.orderbook_yes}
+    no_map = {o.id: copy.deepcopy(o) for o in data.orderbook_no}
     
     yes_orders = copy.deepcopy(data.orderbook_yes)
     no_orders = copy.deepcopy(data.orderbook_no)
