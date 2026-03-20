@@ -47,14 +47,14 @@ class ATOResponse(BaseModel):
 # CLEARING PRICE
 # =========================
 
-def calculate_clearing_price(orderbook_yes: List[Order], orderbook_no: List[Order]):
+def calculate_clearing_price(orders_yes: List[Order], orders_no: List[Order]):
     yes_volume = [0] * 101
     no_volume = [0] * 101
 
-    for o in orderbook_yes:
+    for o in orders_yes:
         yes_volume[o.price] += o.remain
 
-    for o in orderbook_no:
+    for o in orders_no:
         no_volume[o.price] += o.remain
     
     demand_yes = [0] * 101
@@ -91,9 +91,9 @@ def calculate_clearing_price(orderbook_yes: List[Order], orderbook_no: List[Orde
 # FILTER + SORT
 # =========================
 
-def filter_orders(orderbook_yes: List[Order], orderbook_no: List[Order], p: int):
-    yes_valid = [o for o in orderbook_yes if o.price >= p]
-    no_valid = [o for o in orderbook_no if o.price >= (100 - p)]
+def filter_orders(orders_yes: List[Order], orders_no: List[Order], p: int):
+    yes_valid = [o for o in orders_yes if o.price >= p]
+    no_valid = [o for o in orders_no if o.price >= (100 - p)]
     return yes_valid, no_valid
 
 def sort_orders(yes_orders: List[Order], no_orders: List[Order]):
@@ -176,11 +176,11 @@ def calculate_settlements(trades: List[Trade], yes_map: Dict[str, Order], no_map
 @router.post("/clear", response_model=ATOResponse)
 def clear_ato(data: ATORequest):
 
-    yes_map = {o.id: copy.deepcopy(o) for o in data.orderbook_yes}
-    no_map = {o.id: copy.deepcopy(o) for o in data.orderbook_no}
+    yes_map = {o.id: copy.deepcopy(o) for o in data.orders_yes}
+    no_map = {o.id: copy.deepcopy(o) for o in data.orders_no}
     
-    yes_orders = copy.deepcopy(data.orderbook_yes)
-    no_orders = copy.deepcopy(data.orderbook_no)
+    yes_orders = copy.deepcopy(data.orders_yes)
+    no_orders = copy.deepcopy(data.orders_no)
 
     p, matched_volume = calculate_clearing_price(yes_orders, no_orders)
 
