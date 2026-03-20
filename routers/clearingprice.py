@@ -32,9 +32,9 @@ class Trade(BaseModel):
     quantity: int 
 
 class ATORequest(BaseModel):
-    market_id: str
-    orderbook_yes: List[Order]
-    orderbook_no: List[Order]
+    option_id: str
+    orders_yes: List[Order]
+    orders_no: List[Order]
 
 class ATOResponse(BaseModel):
     clearing_price_yes: Optional[int]
